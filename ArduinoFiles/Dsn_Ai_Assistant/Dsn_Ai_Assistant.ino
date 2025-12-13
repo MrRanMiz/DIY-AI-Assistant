@@ -1,7 +1,9 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <TFT_eSPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "driver/i2s.h"
 #include <LittleFS.h>
 
@@ -18,6 +20,13 @@ String server_base_url = "https://YourUserID-YourServerName.hf.space";
 
 #define BUTTON_PIN 5
 
+// I2C pins for SSD1306 OLED
+#define OLED_SDA 21
+#define OLED_SCL 22
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1  // Reset pin not used
+
 #define I2S0_SCK 18  // Microphone
 #define I2S0_WS 17
 #define I2S0_DIN 15
@@ -33,7 +42,7 @@ const int BUFFER_SIZE = 1024;
 const int MAX_RECORD_TIME_MS = 10000;
 String getAnswer = "";
 
-TFT_eSPI tft = TFT_eSPI();
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 uint8_t* record_buffer = nullptr;
 size_t record_buffer_size = 0;
@@ -65,8 +74,52 @@ void printMemoryInfo() {
   }
 }
 
+void displayMessage(const char* msg, bool invert = false) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  
+  if (invert) {
+    display.fillRect(0, 0, SCREEN_WIDTH, 10, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+  }
+  
+  display.println(msg);
+  display.display();
+}
+
+void displayTwoLines(const char* line1, const char* line2, bool invert = false) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  
+  if (invert) {
+    display.fillRect(0, 0, SCREEN_WIDTH, 20, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+  }
+  
+  display.setCursor(0, 0);
+  display.println(line1);
+  display.setCursor(0, 12);
+  display.println(line2);
+  display.display();
+}
+
 void setup() {
   Serial.begin(115200);
+
+  // Initialize I2C for OLED
+  Wire.begin(OLED_SDA, OLED_SCL);
+  
+  // Initialize OLED display
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+  
+  display.clearDisplay();
+  display.display();
 
   i2s_config_t rec_cfg = {
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
@@ -118,13 +171,7 @@ void setup() {
     Serial.println("LittleFS init failed!");
   }
 
-  tft.init();
-  tft.setRotation(3);
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(10, 50);
-  tft.println("Starting...");
+  displayMessage("Starting...");
 
   Serial.println("System starting...");
   printMemoryInfo();
@@ -139,31 +186,20 @@ void setup() {
 
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("\nWiFi connection failed!");
-    tft.fillScreen(TFT_RED);
-    tft.setTextSize(1);
-    tft.setCursor(10, 50);
-    tft.println("WiFi Failed!");
-    while (1)
-      ;
+    displayMessage("WiFi Failed!", true);
+    while (1);
   }
 
   Serial.println("\nWiFi connected!");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
-  tft.fillScreen(TFT_ORANGE);
-  tft.setCursor(10, 50);
-  tft.println("Checking server...");
+  displayMessage("Checking server...");
 
   if (checkServerStatus()) {
-    tft.fillScreen(TFT_BLUE);
-    tft.setTextColor(TFT_WHITE, TFT_BLUE);
-    tft.setCursor(10, 50);
-    tft.println("Assistant Ready");
+    displayTwoLines("Assistant", "Ready");
   } else {
-    tft.fillScreen(TFT_RED);
-    tft.setCursor(10, 50);
-    tft.println("Server Not Ready");
+    displayMessage("Server Not Ready", true);
   }
 }
 
@@ -231,14 +267,14 @@ void startRecording() {
 
   record_position = 44;
 
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(10, 50);
-  tft.println("Recording...");
-
-  tft.setCursor(10, 90);
-  tft.println("0 sec");
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Recording...");
+  display.setCursor(0, 20);
+  display.println("0 sec");
+  display.display();
 }
 
 void recordAudioData() {
@@ -250,9 +286,14 @@ void recordAudioData() {
     record_position += bytes_read;
 
     int elapsed_sec = (millis() - record_start_time) / 1000;
-    tft.fillRect(10, 90, 70, 30, TFT_BLACK);
-    tft.setCursor(10, 90);
-    tft.printf("%d sec", elapsed_sec);
+    
+    // Update only the time portion
+    display.fillRect(0, 20, 60, 10, SSD1306_BLACK);
+    display.setCursor(0, 20);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.printf("%d sec", elapsed_sec);
+    display.display();
   }
 }
 
@@ -274,34 +315,20 @@ void processAudio() {
     return;
   }
 
-  tft.fillScreen(TFT_ORANGE);
-  tft.setTextColor(TFT_WHITE, TFT_ORANGE);
-  tft.setTextSize(2);
-  tft.setCursor(10, 50);
-  tft.println("Processing...");
+  displayMessage("Processing...");
 
   bool success = sendAudioToServer();
 
   if (success) {
-    tft.fillScreen(TFT_GREEN);
-    tft.setTextColor(TFT_WHITE, TFT_GREEN);
-    tft.setCursor(10, 50);
-    tft.println("Success!");
+    displayMessage("Success!");
   } else {
-    tft.fillScreen(TFT_RED);
-    tft.setTextColor(TFT_WHITE, TFT_RED);
-    tft.setCursor(10, 50);
-    tft.println("Failed!");
+    displayMessage("Failed!", true);
     delay(2000);
   }
 
   cleanupRecording();
 
-  tft.fillScreen(TFT_BLUE);
-  tft.setTextColor(TFT_WHITE, TFT_BLUE);
-  tft.setTextSize(2);
-  tft.setCursor(10, 50);
-  tft.println("Ready");
+  displayTwoLines("Ready", "");
 }
 
 void cleanupRecording() {
@@ -354,21 +381,37 @@ bool sendAudioToServer() {
 bool downloadAndPlayAudio(const String& stream_url, const String& file_id) {
   String local_filename = "/response_" + file_id + ".mp3";
 
-  tft.fillScreen(TFT_PURPLE);
-  tft.setTextColor(TFT_WHITE, TFT_PURPLE);
-  tft.setTextSize(2);
-  tft.setCursor(10, 50);
-  tft.println("Thinking...");
+  displayMessage("Thinking...");
 
   if (!downloadAudioFile(stream_url, local_filename)) {
     Serial.println("Download failed!");
     return false;
   }
 
-  tft.fillScreen(TFT_GREEN);
-  tft.setTextColor(TFT_BLACK, TFT_GREEN);
-  tft.setCursor(10, 50);
-  tft.println(getAnswer.c_str());
+  // Display AI response (truncated to fit screen)
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  
+  // Wrap text to fit 128px width (approx 21 chars per line at size 1)
+  int maxChars = 21;
+  int lines = 0;
+  int startIdx = 0;
+  
+  while (startIdx < getAnswer.length() && lines < 6) {
+    int endIdx = startIdx + maxChars;
+    if (endIdx > getAnswer.length()) {
+      endIdx = getAnswer.length();
+    }
+    
+    String line = getAnswer.substring(startIdx, endIdx);
+    display.println(line);
+    startIdx = endIdx;
+    lines++;
+  }
+  
+  display.display();
 
   bool playback_success = playAudioFile(local_filename);
 
