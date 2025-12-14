@@ -21,11 +21,11 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Get API tokens from environment
 HF_TOKEN = os.environ.get('HF_TOKEN', '')
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 # Initialize API clients
 hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else InferenceClient()
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 @app.route("/")
 def home():
@@ -151,6 +151,11 @@ def generate_response(text):
             return "I'm listening. Please speak clearly."
         
         logger.info(f"Generating response for: {text}")
+        
+        # Check if Groq client is available
+        if not groq_client:
+            logger.warning("GROQ_API_KEY not set, using fallback responses")
+            raise ValueError("Groq API not configured")
         
         # Use Groq API for conversational AI
         chat_completion = groq_client.chat.completions.create(

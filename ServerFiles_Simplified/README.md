@@ -4,26 +4,53 @@ This is a simplified version of the server that returns **text responses only** 
 
 Perfect for when you don't have a speaker/amplifier connected to your ESP32.
 
+## Features
+
+- 🎤 **Speech-to-Text**: HuggingFace Whisper API
+- 🤖 **Conversational AI**: Groq llama-3.1-8b-instant (fast & free!)
+- 💬 **Text Response**: Short responses optimized for OLED display
+- 🚀 **Lightweight**: ~200 lines of code
+
 ## Files in This Folder
 
-- **app.py** - Main server code (~170 lines, simple!)
-- **requirements.txt** - Python packages (only 2!)
+- **app.py** - Main server code
+- **requirements.txt** - Python packages
 - **Dockerfile** - Docker configuration for HuggingFace deployment
-- **test_local.ps1** - PowerShell script to test locally
+- **.env.example** - Environment variable template
+- **.gitignore** - Prevents committing API keys
 - **README.md** - This file
 
 ---
 
-## Quick Start - Local Testing (Recommended First!)
+## Quick Start - Local Testing
 
-### Step 1: Install Python Dependencies
+### Step 1: Get API Keys
+
+1. **HuggingFace Token**: https://huggingface.co/settings/tokens
+2. **Groq API Key**: https://console.groq.com/keys
+
+### Step 2: Set Environment Variables
+
+**Windows PowerShell:**
+```powershell
+$env:HF_TOKEN = "your_huggingface_token"
+$env:GROQ_API_KEY = "your_groq_api_key"
+```
+
+**Linux/Mac:**
+```bash
+export HF_TOKEN="your_huggingface_token"
+export GROQ_API_KEY="your_groq_api_key"
+```
+
+### Step 3: Install Dependencies
 
 ```powershell
 cd ServerFiles_Simplified
 pip install -r requirements.txt
 ```
 
-### Step 2: Run Server Locally
+### Step 4: Run Server
 
 ```powershell
 python app.py
@@ -35,9 +62,9 @@ INFO:__main__:Starting ESP32 Voice Assistant Server (Text-Only Mode)
 INFO:werkzeug: * Running on http://0.0.0.0:7860
 ```
 
-### Step 3: Test It
+### Step 5: Test It
 
-**Open a NEW PowerShell window** and run:
+**Open a NEW PowerShell window** and test:
 
 ```powershell
 .\test_local.ps1
