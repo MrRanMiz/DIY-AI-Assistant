@@ -1,3 +1,4 @@
 flask
 requests
 huggingface_hub
+groq

@@ -10,6 +10,7 @@ import os
 import logging
 import tempfile
 from huggingface_hub import InferenceClient
+from groq import Groq
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,11 +19,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Get HuggingFace token from environment
+# Get API tokens from environment
 HF_TOKEN = os.environ.get('HF_TOKEN', '')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')
 
-# Initialize HuggingFace Inference Client
-client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else InferenceClient()
+# Initialize API clients
+hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else InferenceClient()
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 @app.route("/")
 def home():
@@ -113,7 +116,7 @@ def transcribe_audio(audio_bytes):
         
         try:
             # Use the temporary file path for transcription
-            result = client.automatic_speech_recognition(temp_path)
+            result = hf_client.automatic_speech_recognition(temp_path)
         finally:
             # Clean up the temporary file
             if os.path.exists(temp_path):
@@ -141,7 +144,7 @@ def transcribe_audio(audio_bytes):
 
 def generate_response(text):
     """
-    Generate AI response using simple pattern matching (fallback when API unavailable)
+    Generate AI response using Groq API (llama-3.1-8b-instant)
     """
     try:
         if not text or text in ["Sorry, I couldn't understand that.", "Sorry, transcription failed."]:
@@ -149,26 +152,42 @@ def generate_response(text):
         
         logger.info(f"Generating response for: {text}")
         
-        # Simple response generation (can be enhanced later)
-        text_lower = text.lower()
+        # Use Groq API for conversational AI
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful AI voice assistant for an ESP32 device with limited display. "
+                        "Keep responses SHORT (1-2 sentences max, under 100 characters when possible). "
+                        "Be conversational and friendly. Do NOT generate code, long explanations, or lists. "
+                        "Just provide brief, natural conversational responses."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            model="llama-3.1-8b-instant",
+            max_tokens=100,  # Limit response length
+            temperature=0.7  # Natural conversation
+        )
         
-        if "hello" in text_lower or "hi" in text_lower:
-            return "Hello! How can I help you today?"
-        elif "how are you" in text_lower:
-            return "I'm doing well, thank you for asking!"
-        elif "weather" in text_lower:
-            return "I don't have access to weather data, but I hope it's nice where you are!"
-        elif "time" in text_lower:
-            return "I don't have access to the current time, but I'm always here to help!"
-        elif "thank" in text_lower:
-            return "You're welcome!"
-        else:
-            # Echo back what was understood
-            return f"I heard you say: {text}"
+        response = chat_completion.choices[0].message.content.strip()
+        logger.info(f"Groq response: {response}")
+        return response
             
     except Exception as e:
         logger.error(f"Response generation error: {type(e).__name__}: {str(e)}")
-        return "I'm here to assist you."
+        # Fallback to simple pattern matching if Groq fails
+        text_lower = text.lower()
+        if "hello" in text_lower or "hi" in text_lower:
+            return "Hello! How can I help you?"
+        elif "thank" in text_lower:
+            return "You're welcome!"
+        else:
+            return "I heard you!"
 
 if __name__ == "__main__":
     logger.info("Starting ESP32 Voice Assistant Server (Text-Only Mode)")
