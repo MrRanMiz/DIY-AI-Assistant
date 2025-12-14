@@ -1,3 +1,13 @@
+---
+title: ESP32 Voice Assistant
+emoji: 🎤
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: app.py
+pinned: false
+---
+
 # ESP32 AI Voice Assistant - Simplified Server (Text-Only)
 
 This is a simplified version of the server that returns **text responses only** (no audio output).
