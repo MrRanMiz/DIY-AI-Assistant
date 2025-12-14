@@ -1,0 +1,180 @@
+"""
+Simplified ESP32 AI Voice Assistant Server - Text Response Only
+No audio output, just transcription and text response
+~80 lines - Path A (API-based)
+"""
+
+from flask import Flask, request, jsonify
+import requests
+import os
+import logging
+import tempfile
+from huggingface_hub import InferenceClient
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Get HuggingFace token from environment
+HF_TOKEN = os.environ.get('HF_TOKEN', '')
+
+# Initialize HuggingFace Inference Client
+client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else InferenceClient()
+
+@app.route("/")
+def home():
+    """Home page"""
+    return """
+    <html>
+        <head><title>ESP32 Voice Assistant</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+            <h1>🎤 ESP32 AI Voice Assistant Server</h1>
+            <p>Status: <span style="color: green;">Running</span></p>
+            <h3>Endpoints:</h3>
+            <ul>
+                <li><code>GET /status</code> - Check server status</li>
+                <li><code>POST /process_audio</code> - Process audio and get text response</li>
+            </ul>
+            <p><small>Simplified version - Text response only (no audio output)</small></p>
+        </body>
+    </html>
+    """
+
+@app.route("/status")
+def status():
+    """Status endpoint - check if server is ready"""
+    logger.info("Status check requested")
+    return jsonify({
+        "ready": True,
+        "status": "ok",
+        "mode": "text-only",
+        "models": {
+            "stt": "whisper-base (API)",
+            "llm": "flan-t5-base (API)",
+            "tts": "none (text-only mode)"
+        }
+    })
+
+@app.route("/process_audio", methods=["POST"])
+def process_audio():
+    """
+    Main endpoint - receives audio, returns text response
+    Expected: WAV audio file in request body
+    Returns: JSON with transcript and AI response
+    """
+    try:
+        # Get audio data from request
+        audio_data = request.data
+        
+        if not audio_data:
+            logger.error("No audio data received")
+            return jsonify({"error": "No audio data"}), 400
+        
+        logger.info(f"Received audio data: {len(audio_data)} bytes")
+        
+        # Step 1: Transcribe audio to text
+        logger.info("Transcribing audio...")
+        transcript = transcribe_audio(audio_data)
+        logger.info(f"Transcript: {transcript}")
+        
+        # Step 2: Generate AI response
+        logger.info("Generating response...")
+        response_text = generate_response(transcript)
+        logger.info(f"Response: {response_text}")
+        
+        # Return both transcript and response
+        return jsonify({
+            "success": True,
+            "transcript": transcript,
+            "response": response_text
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing audio: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+def transcribe_audio(audio_bytes):
+    """
+    Transcribe audio using HuggingFace Whisper via InferenceClient
+    """
+    try:
+        logger.info("Using HuggingFace InferenceClient for transcription...")
+        
+        # Save audio bytes to a temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
+            temp_audio.write(audio_bytes)
+            temp_path = temp_audio.name
+        
+        try:
+            # Use the temporary file path for transcription
+            result = client.automatic_speech_recognition(temp_path)
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        
+        logger.info(f"Whisper result: {result}")
+        
+        if result and isinstance(result, dict) and "text" in result:
+            text = result["text"].strip()
+        elif result and isinstance(result, str):
+            text = result.strip()
+        else:
+            text = str(result).strip() if result else ""
+        
+        if not text or len(text) < 2:
+            return "Sorry, I couldn't understand that."
+        
+        return text
+            
+    except Exception as e:
+        logger.error(f"Transcription error: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return "Sorry, transcription failed."
+
+def generate_response(text):
+    """
+    Generate AI response using simple pattern matching (fallback when API unavailable)
+    """
+    try:
+        if not text or text in ["Sorry, I couldn't understand that.", "Sorry, transcription failed."]:
+            return "I'm listening. Please speak clearly."
+        
+        logger.info(f"Generating response for: {text}")
+        
+        # Simple response generation (can be enhanced later)
+        text_lower = text.lower()
+        
+        if "hello" in text_lower or "hi" in text_lower:
+            return "Hello! How can I help you today?"
+        elif "how are you" in text_lower:
+            return "I'm doing well, thank you for asking!"
+        elif "weather" in text_lower:
+            return "I don't have access to weather data, but I hope it's nice where you are!"
+        elif "time" in text_lower:
+            return "I don't have access to the current time, but I'm always here to help!"
+        elif "thank" in text_lower:
+            return "You're welcome!"
+        else:
+            # Echo back what was understood
+            return f"I heard you say: {text}"
+            
+    except Exception as e:
+        logger.error(f"Response generation error: {type(e).__name__}: {str(e)}")
+        return "I'm here to assist you."
+
+if __name__ == "__main__":
+    logger.info("Starting ESP32 Voice Assistant Server (Text-Only Mode)")
+    logger.info(f"HF_TOKEN configured: {bool(HF_TOKEN)}")
+    
+    # Get port from environment or use default
+    port = int(os.environ.get("PORT", 7860))
+    
+    app.run(host="0.0.0.0", port=port, debug=False)
