@@ -1,3 +1,49 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Typewriter effect with vertical scrolling for OLED
+void typewriterPrintScrolling(int x, int y, String text, int delayMs = 40) {
+  int charWidth = 6; // For text size 1, 6px per char
+  int lineHeight = 8; // For text size 1, 8px per line
+  int maxX = SCREEN_WIDTH;
+  int maxY = SCREEN_HEIGHT;
+  display.setCursor(x, y);
+  for (size_t i = 0; i < text.length(); i++) {
+    char c = text[i];
+    display.write(c);
+    display.display();
+    delay(delayMs);
+    x += charWidth;
+    if (x >= maxX || c == '\n') {
+      x = 0;
+      y += lineHeight;
+      display.setCursor(x, y);
+      if (y >= maxY) {
+        // Scroll up: copy buffer up by one line
+        for (int row = 0; row < maxY - lineHeight; row++) {
+          for (int col = 0; col < maxX; col++) {
+            int pixel = display.getPixel(col, row + lineHeight);
+            display.drawPixel(col, row, pixel);
+          }
+        }
+        // Clear last line
+        for (int col = 0; col < maxX; col++) {
+          for (int row = maxY - lineHeight; row < maxY; row++) {
+            display.drawPixel(col, row, SSD1306_BLACK);
+          }
+        }
+        y = maxY - lineHeight;
+        display.setCursor(x, y);
+        display.display();
+      }
+    }
+  }
+}
 /*
  * ESP32 AI Voice Assistant - Text-Only (No Audio Output)
  * Target: Arduino Nano ESP32 (ESP32-S3, 8MB PSRAM)
@@ -17,13 +63,6 @@
  * Serial Monitor: 115200 baud
  */
 
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -129,16 +168,6 @@ void loop() {
   
   delay(10);
 }
-
-void typewriterPrint(int x, int y, String text, int delayMs = 40) {
-  display.setCursor(x, y);
-  for (size_t i = 0; i < text.length(); i++) {
-    display.write(text[i]);
-    display.display();
-    delay(delayMs);
-  }
-}
-
 
 void initI2SMicrophone() {
   Serial.println("Initializing I2S microphone...");
@@ -297,11 +326,9 @@ bool sendAudioToServer() {
       Serial.printf("│ %s\n", ai_response.c_str());
       Serial.println("└─────────────────────────────────────────\n");
 
-    display.clearDisplay();
-    typewriterPrint(0, 0, "Transcript:");
-    typewriterPrint(0, 10, transcript);      // transcript is your String variable
-    typewriterPrint(0, 30, "AI:");
-    typewriterPrint(0, 40, ai_response);     // ai_response is your String variable
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      typewriterPrintScrolling(0, 0, "Transcript:\n" + transcript + "\nAI:\n" + ai_response);
       
       return success;
     } else {
@@ -386,6 +413,7 @@ void createWavHeader(byte* header, int wavDataSize) {
   header[42] = (byte)((wavDataSize >> 16) & 0xFF);
   header[43] = (byte)((wavDataSize >> 24) & 0xFF);
 }
+
 
 
 void connectWiFi() {
