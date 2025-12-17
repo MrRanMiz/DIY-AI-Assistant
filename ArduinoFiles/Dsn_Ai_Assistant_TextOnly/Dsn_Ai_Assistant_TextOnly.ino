@@ -13,36 +13,80 @@ void typewriterPrintScrolling(int x, int y, String text, int delayMs = 40) {
   int maxX = SCREEN_WIDTH;
   int maxY = SCREEN_HEIGHT;
   display.setCursor(x, y);
-  for (size_t i = 0; i < text.length(); i++) {
+  String word = "";
+  for (size_t i = 0; i <= text.length(); i++) {
     char c = text[i];
-    display.write(c);
-    display.display();
-    delay(delayMs);
-    x += charWidth;
-    if (x >= maxX || c == '\n') {
-      x = 0;
-      y += lineHeight;
-      display.setCursor(x, y);
-      if (y >= maxY) {
-        // Scroll up: copy buffer up by one line
-        for (int row = 0; row < maxY - lineHeight; row++) {
-          for (int col = 0; col < maxX; col++) {
-            int pixel = display.getPixel(col, row + lineHeight);
-            display.drawPixel(col, row, pixel);
-          }
-        }
-        // Clear last line
-        for (int col = 0; col < maxX; col++) {
-          for (int row = maxY - lineHeight; row < maxY; row++) {
-            display.drawPixel(col, row, SSD1306_BLACK);
-          }
-        }
-        y = maxY - lineHeight;
+    // Build up a word or handle end of word
+    if (c != ' ' && c != '\n' && c != '\0') {
+      word += c;
+    }
+    if (c == ' ' || c == '\n' || c == '\0') {
+      // Check if word fits on current line
+      int wordPixelLen = word.length() * charWidth;
+      if (x + wordPixelLen > maxX) {
+        // Move to next line
+        x = 0;
+        y += lineHeight;
         display.setCursor(x, y);
+        if (y >= maxY) {
+          // Scroll up: copy buffer up by one line
+          for (int row = 0; row < maxY - lineHeight; row++) {
+            for (int col = 0; col < maxX; col++) {
+              int pixel = display.getPixel(col, row + lineHeight);
+              display.drawPixel(col, row, pixel);
+            }
+          }
+          // Clear last line
+          for (int col = 0; col < maxX; col++) {
+            for (int row = maxY - lineHeight; row < maxY; row++) {
+              display.drawPixel(col, row, SSD1306_BLACK);
+            }
+          }
+          y = maxY - lineHeight;
+          display.setCursor(x, y);
+          display.display();
+        }
+      }
+      // Print the word
+      for (size_t j = 0; j < word.length(); j++) {
+        display.write(word[j]);
         display.display();
+        delay(delayMs);
+        x += charWidth;
+      }
+      word = "";
+      // Print the space or handle newline
+      if (c == ' ') {
+        display.write(' ');
+        display.display();
+        delay(delayMs);
+        x += charWidth;
+      } else if (c == '\n') {
+        x = 0;
+        y += lineHeight;
+        display.setCursor(x, y);
+        if (y >= maxY) {
+          // Scroll up: copy buffer up by one line
+          for (int row = 0; row < maxY - lineHeight; row++) {
+            for (int col = 0; col < maxX; col++) {
+              int pixel = display.getPixel(col, row + lineHeight);
+              display.drawPixel(col, row, pixel);
+            }
+          }
+          // Clear last line
+          for (int col = 0; col < maxX; col++) {
+            for (int row = maxY - lineHeight; row < maxY; row++) {
+              display.drawPixel(col, row, SSD1306_BLACK);
+            }
+          }
+          y = maxY - lineHeight;
+          display.setCursor(x, y);
+          display.display();
+        }
       }
     }
   }
+
 }
 /*
  * ESP32 AI Voice Assistant - Text-Only (No Audio Output)
