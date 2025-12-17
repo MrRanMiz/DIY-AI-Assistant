@@ -17,14 +17,22 @@
  * Serial Monitor: 115200 baud
  */
 
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "driver/i2s.h"
 
 // WiFi credentials
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "HUAWEI-2.4G-D87y";
+const char* password = "Cbn9yxAU";
 
 // Server URL
 const char* server_url = "https://wesleyhuggingface-esp32-voice-assistant.hf.space/process_audio";
@@ -52,6 +60,16 @@ unsigned long record_start_time = 0;
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
+    Wire.begin(7,8); // SDA = GPIO 8, SCL = GPIO 7
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED init failed!");
+    for(;;);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.display();
   
   Serial.println("\n=================================");
   Serial.println("ESP32 Voice Assistant - Text Only");
@@ -268,6 +286,14 @@ bool sendAudioToServer() {
       Serial.println("│ AI RESPONSE:");
       Serial.printf("│ %s\n", ai_response.c_str());
       Serial.println("└─────────────────────────────────────────\n");
+
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("-----Transcript------");
+      display.println(transcript);
+      display.println("--------AI-----------");
+      display.println(ai_response);
+      display.display();
       
       return success;
     } else {
