@@ -130,6 +130,16 @@ void loop() {
   delay(10);
 }
 
+void typewriterPrint(int x, int y, String text, int delayMs = 40) {
+  display.setCursor(x, y);
+  for (size_t i = 0; i < text.length(); i++) {
+    display.write(text[i]);
+    display.display();
+    delay(delayMs);
+  }
+}
+
+
 void initI2SMicrophone() {
   Serial.println("Initializing I2S microphone...");
   
@@ -287,13 +297,11 @@ bool sendAudioToServer() {
       Serial.printf("│ %s\n", ai_response.c_str());
       Serial.println("└─────────────────────────────────────────\n");
 
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.println("-----Transcript------");
-      display.println(transcript);
-      display.println("--------AI-----------");
-      display.println(ai_response);
-      display.display();
+    display.clearDisplay();
+    typewriterPrint(0, 0, "Transcript:");
+    typewriterPrint(0, 10, transcript);      // transcript is your String variable
+    typewriterPrint(0, 30, "AI:");
+    typewriterPrint(0, 40, ai_response);     // ai_response is your String variable
       
       return success;
     } else {
@@ -378,6 +386,7 @@ void createWavHeader(byte* header, int wavDataSize) {
   header[42] = (byte)((wavDataSize >> 16) & 0xFF);
   header[43] = (byte)((wavDataSize >> 24) & 0xFF);
 }
+
 
 void connectWiFi() {
   Serial.printf("\nConnecting to WiFi: %s\n", ssid);
