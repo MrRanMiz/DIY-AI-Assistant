@@ -6,6 +6,9 @@
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+bool introRecordDone= false;
+
+
 const uint8_t PROGMEM wakeUp[][1024]= {
   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -2108,6 +2111,92 @@ const uint8_t PROGMEM loading[] [1024]= {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}//7
 };
 
+void drawBitmapScaled(int x, int y, const uint8_t *bitmap, int w, int h, int scale) {
+  for(int i = 0; i < w; i++) {
+    for(int j = 0; j < h; j++) {
+      // Check if the pixel is set
+      if (bitmap[j * (w/8) + i / 8] & (128 >> (i % 8))) {
+        // Draw a filled rectangle to scale the pixel
+        display.fillRect(x + i*scale, y + j*scale, scale, scale, SSD1306_WHITE);
+      }
+    }
+  }
+}
+
+int animation = 0;
+
+unsigned long lastUpdate = 0;
+int frameWakeUp=0;
+int frameDilate=0;
+int frameBlink=0;
+int frameMitosis = 0;
+int frameLoading = 0;
+int frameRecordIntro= 0;
+int frameRecord= 0;
+
+bool recordIntroDone= false;
+bool 
+
+void handleAnimation() {
+  Serial.println(animation);
+    unsigned long now = millis();
+    if (now - lastUpdate > 75) {
+        lastUpdate = now;
+
+        // Increment frame for the active animation only
+        if (animation == 0) {
+            frameWakeUp++;
+            if (frameWakeUp >= 5) { // mitosis has 10 frames: 0–9
+                frameWakeUp = 0;
+                animation = 1; // switch animation
+            }
+        }
+        else if (animation == 1) {
+            frameDilate++;
+            if (frameDilate >= 30) frameDilate = 0; // loading has 9 frames: 0–8
+        }
+        else if (animation==2){
+            frameRecordIntro++;
+						if (frameRecordIntro >=16) {
+							frameRecordIntro= 0;
+							animation = 3;
+						}
+        }
+				else if (animation==3){
+					frameRecord++;
+					if (frameRecord >= 9) frameRecord= 0; 
+				}
+    }
+
+    display.clearDisplay();
+
+    if (animation == 0) {
+        drawBitmapScaled(-16, -37, wakeUp[frameWakeUp], 80, 64, 2);
+    } 
+    else if (animation == 1) {
+        //drawBitmapScaled(-9,-41, loading[frameLoading], 80, 64, 2);
+        if (frameDilate<=3){
+          drawBitmapScaled(-16, -37, dilate[frameDilate], 80, 64, 2);
+          Serial.println(frameDilate);
+        }
+        else{
+          drawBitmapScaled(-16, -37, eyesIdle, 80, 64, 2);
+        }
+    
+    }
+    else if (animation==2){
+			drawBitmapScaled(-16, -37, recordIntro[frameRecordIntro], 80, 64, 2);
+    }
+		else if (animation==3){
+			drawBitmapScaled(-16, -37, record[frameRecord], 80, 64, 2);
+		}
+    
+
+
+    display.display();
+}
+
+
 
 
 
@@ -2202,6 +2291,8 @@ void typewriterPrintScrolling(int x, int y, String text, int delayMs = 40) {
   }
 
 }
+
+
 /*
  * ESP32 AI Voice Assistant - Text-Only (No Audio Output)
  * Target: Arduino Nano ESP32 (ESP32-S3, 8MB PSRAM)
@@ -2296,10 +2387,16 @@ void setup() {
 }
 
 void loop() {
+
+	handleAnimation();
   // Hold-to-record button logic (same as original)
   if (digitalRead(BUTTON_PIN) == LOW && !is_recording) {
     delay(50);  // Debounce
     if (digitalRead(BUTTON_PIN) == LOW) {
+			if (!introRecordDone){
+				animation= 2;
+				introRecordDone= true;
+			}
       startRecording();
     }
   }
@@ -2308,6 +2405,7 @@ void loop() {
     delay(50);  // Debounce
     if (digitalRead(BUTTON_PIN) == HIGH) {
       stopRecording();
+			
       processAudio();
     }
   }
