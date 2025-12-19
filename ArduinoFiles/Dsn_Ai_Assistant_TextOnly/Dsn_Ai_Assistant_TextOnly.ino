@@ -2155,7 +2155,7 @@ void handleAnimation() {
         }
         else if (animation == 1) {
             frameDilate++;
-            if (frameDilate >= 30) frameDilate = 0; // loading has 9 frames: 0–8
+            if (frameDilate >= 15) frameDilate = 0; // loading has 9 frames: 0–8
         }
         else if (animation==2){
             frameRecordIntro++;
