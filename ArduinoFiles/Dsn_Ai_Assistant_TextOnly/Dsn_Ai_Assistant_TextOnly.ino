@@ -2139,6 +2139,8 @@ bool recordIntroDone= false;
 
 
 void handleAnimation() {
+
+	if (animation<=5){
     unsigned long now = millis();
     if (now - lastUpdate > 75) {
         lastUpdate = now;
@@ -2212,6 +2214,7 @@ void handleAnimation() {
 
 
     display.display();
+}
 }
 
 
@@ -2415,6 +2418,10 @@ void loop() {
 			if (!introRecordDone){
 				animation= 2;
 				introRecordDone= true;
+			}
+			if (animation==6){
+				animation= 4;
+
 			}
       startRecording();
 			
