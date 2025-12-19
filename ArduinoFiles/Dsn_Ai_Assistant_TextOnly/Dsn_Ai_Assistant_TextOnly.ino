@@ -2547,7 +2547,7 @@ void handleAnimation() {
 
 	if (animation<=5){
     unsigned long now = millis();
-    if (now - lastUpdate > 75) {
+    if (now - lastUpdate > 50) {
         lastUpdate = now;
 
         // Increment frame for the active animation only
@@ -2560,7 +2560,7 @@ void handleAnimation() {
         }
         else if (animation == 1) {
             frameDilate++;
-            if (frameDilate >= 75) frameDilate = 0; // loading has 9 frames: 0–8
+            if (frameDilate >= 50) frameDilate = 0; // loading has 9 frames: 0–8
         }
         else if (animation==2){
             frameRecordIntro++;
@@ -2599,7 +2599,7 @@ void handleAnimation() {
           drawBitmapScaled(-16, -37, dilate[frameDilate], 80, 64, 2);
           Serial.println(frameDilate);
         }
-        else if (frameDilate<=65){
+        else if (frameDilate<=40){
           drawBitmapScaled(-16, -37, eyesIdle, 80, 64, 2);
         }
 				else{
