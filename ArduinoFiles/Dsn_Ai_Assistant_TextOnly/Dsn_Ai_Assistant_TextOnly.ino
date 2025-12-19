@@ -7,6 +7,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 bool introRecordDone= false;
+bool mitosisDone= false;
 
 
 const uint8_t PROGMEM wakeUp[][1024]= {
@@ -2135,10 +2136,9 @@ int frameRecordIntro= 0;
 int frameRecord= 0;
 
 bool recordIntroDone= false;
-bool 
+
 
 void handleAnimation() {
-  Serial.println(animation);
     unsigned long now = millis();
     if (now - lastUpdate > 75) {
         lastUpdate = now;
@@ -2159,12 +2159,25 @@ void handleAnimation() {
             frameRecordIntro++;
 						if (frameRecordIntro >=16) {
 							frameRecordIntro= 0;
+							recordIntroDone= true;
 							animation = 3;
+							
 						}
         }
 				else if (animation==3){
 					frameRecord++;
 					if (frameRecord >= 9) frameRecord= 0; 
+				}
+				else if (animation==4){
+					frameMitosis++;
+					if (frameMitosis >=9){
+						frameMitosis= 0;
+						animation= 5;
+					}
+				}
+				else if (animation==5){
+					frameLoading++;
+					if (frameLoading >=8) frameLoading= 0;
 				}
     }
 
@@ -2190,7 +2203,12 @@ void handleAnimation() {
 		else if (animation==3){
 			drawBitmapScaled(-16, -37, record[frameRecord], 80, 64, 2);
 		}
-    
+    else if (animation==4){
+			drawBitmapScaled(-16, -37, mitosis[frameMitosis],80, 64,2);
+		}
+		else if (animation==5){
+			drawBitmapScaled(-16, -37, loading[frameLoading],80, 64,2);
+		}
 
 
     display.display();
@@ -2387,6 +2405,7 @@ void setup() {
 }
 
 void loop() {
+	Serial.println(is_recording);
 
 	handleAnimation();
   // Hold-to-record button logic (same as original)
@@ -2398,8 +2417,17 @@ void loop() {
 				introRecordDone= true;
 			}
       startRecording();
+			
+
     }
   }
+
+	
+				if (recordIntroDone && !mitosisDone){
+				animation= 4;
+				mitosisDone= true;
+			}
+
   
   if (digitalRead(BUTTON_PIN) == HIGH && is_recording) {
     delay(50);  // Debounce
@@ -2510,6 +2538,10 @@ void recordAudioData() {
 }
 
 void stopRecording() {
+
+
+
+
   Serial.println("🛑 Recording stopped");
   is_recording = false;
   
@@ -2570,6 +2602,7 @@ bool sendAudioToServer() {
     DeserializationError error = deserializeJson(doc, response);
     
     if (!error) {
+			animation= 6;
       bool success = doc["success"].as<bool>();
       String transcript = doc["transcript"].as<String>();
       String ai_response = doc["response"].as<String>();
